@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -30,34 +31,35 @@ var (
 	defaultInitialConnWindowSize int32 = 4 << 20
 )
 
-type ClientOption struct {
+type Option struct {
 	PoolSize         int
 	DialTimeOut      time.Duration
 	KeepAlive        time.Duration
 	KeepAliveTimeout time.Duration
+	DialOptions      []grpc.DialOption
 }
 
-type ClientPool struct {
+type Pool struct {
 	endpoint string
 	next     int64
 	cap      int64
 
-	option *ClientOption
+	option *Option
 	conns  []*grpc.ClientConn
 	sync.Mutex
 }
 
-func (cc *ClientPool) getConn() (*grpc.ClientConn, error) {
+func (p *Pool) getConn() (*grpc.ClientConn, error) {
 	var (
 		idx  int64
 		next int64
 		err  error
 	)
 
-	next = atomic.AddInt64(&cc.next, 1)
-	idx = next % cc.cap
-	conn := cc.conns[idx]
-	if conn != nil && cc.checkState(conn) == nil {
+	next = atomic.AddInt64(&p.next, 1)
+	idx = next % p.cap
+	conn := p.conns[idx]
+	if conn != nil && p.checkState(conn) == nil {
 		return conn, nil
 	}
 
@@ -65,25 +67,25 @@ func (cc *ClientPool) getConn() (*grpc.ClientConn, error) {
 		conn.Close()
 	}
 
-	cc.Lock()
-	defer cc.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
-	// 双检, 防止已经初始化
-	conn = cc.conns[idx]
-	if conn != nil && cc.checkState(conn) == nil {
+	// double check to prevent initialization
+	conn = p.conns[idx]
+	if conn != nil && p.checkState(conn) == nil {
 		return conn, nil
 	}
 
-	conn, err = cc.connect()
+	conn, err = p.connect()
 	if err != nil {
 		return nil, err
 	}
 
-	cc.conns[idx] = conn
+	p.conns[idx] = conn
 	return conn, nil
 }
 
-func (cc *ClientPool) checkState(conn *grpc.ClientConn) error {
+func (p *Pool) checkState(conn *grpc.ClientConn) error {
 	state := conn.GetState()
 	switch state {
 	case connectivity.TransientFailure, connectivity.Shutdown:
@@ -93,11 +95,8 @@ func (cc *ClientPool) checkState(conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (cc *ClientPool) connect() (*grpc.ClientConn, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), cc.option.DialTimeOut)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx,
-		cc.endpoint,
+func (p *Pool) defaultDialOptions() []grpc.DialOption {
+	return []grpc.DialOption{
 		//grpc.WithBlock(),
 		//grpc.WithConnectParams(grpc.ConnectParams{
 		//	Backoff:           backoff.Config{MaxDelay: 8*time.Second},
@@ -110,10 +109,21 @@ func (cc *ClientPool) connect() (*grpc.ClientConn, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaultMaxSendMsgSize)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaultMaxMaxRecvMsgSize)),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                cc.option.KeepAlive,
-			Timeout:             cc.option.KeepAliveTimeout,
+			Time:                p.option.KeepAlive,
+			Timeout:             p.option.KeepAliveTimeout,
 			PermitWithoutStream: true,
-		}))
+		}),
+	}
+}
+
+func (p *Pool) connect() (*grpc.ClientConn, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), p.option.DialTimeOut)
+	defer cancel()
+	opts := p.option.DialOptions
+	if opts == nil {
+		opts = p.defaultDialOptions()
+	}
+	conn, err := grpc.DialContext(ctx, p.endpoint, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +131,11 @@ func (cc *ClientPool) connect() (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-func (cc *ClientPool) Close() {
-	cc.Lock()
-	defer cc.Unlock()
+func (p *Pool) Close() {
+	p.Lock()
+	defer p.Unlock()
 
-	for _, conn := range cc.conns {
+	for _, conn := range p.conns {
 		if conn == nil {
 			continue
 		}
@@ -133,7 +143,7 @@ func (cc *ClientPool) Close() {
 	}
 }
 
-func newClientPoolWithOption(endpoint string, option *ClientOption) *ClientPool {
+func newClientPoolWithOption(endpoint string, option *Option) *Pool {
 	if (option.PoolSize) <= 0 {
 		option.PoolSize = defaultPoolSize
 	}
@@ -150,7 +160,7 @@ func newClientPoolWithOption(endpoint string, option *ClientOption) *ClientPool 
 		option.KeepAliveTimeout = defaultKeepAliveTimeout
 	}
 
-	return &ClientPool{
+	return &Pool{
 		endpoint: endpoint,
 		option:   option,
 		cap:      int64(option.PoolSize),
@@ -159,12 +169,13 @@ func newClientPoolWithOption(endpoint string, option *ClientOption) *ClientPool 
 }
 
 type ServiceClientPool struct {
-	option   *ClientOption
+	useTLS   bool
+	option   *Option
 	services map[string][]string
-	clients  map[string]*ClientPool
+	clients  map[string]*Pool
 }
 
-func NewServiceClientPool(option *ClientOption) *ServiceClientPool {
+func NewServiceClientPool(option *Option) *ServiceClientPool {
 	return &ServiceClientPool{
 		option:   option,
 		services: make(map[string][]string),
@@ -172,16 +183,43 @@ func NewServiceClientPool(option *ClientOption) *ServiceClientPool {
 }
 
 func (sc *ServiceClientPool) Start() {
-	var clients = make(map[string]*ClientPool, len(sc.services))
-	for endpoint, srvNameArr := range sc.services {
-		cc := newClientPoolWithOption(endpoint, sc.option)
-		for _, srv := range srvNameArr {
-			clients[srv] = cc
+	var clients = make(map[string]*Pool, len(sc.services))
+	if !sc.useTLS {
+		sc.addDialOption(grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	for endpoint, serviceName := range sc.services {
+		clientPool := newClientPoolWithOption(endpoint, sc.option)
+		for _, srv := range serviceName {
+			clients[srv] = clientPool
 		}
 	}
 
 	sc.clients = clients
 	scp = sc
+}
+
+func (sc *ServiceClientPool) addDialOption(opt grpc.DialOption) {
+	sc.option.DialOptions = append(sc.option.DialOptions, opt)
+}
+
+func (sc *ServiceClientPool) SetUnaryInterceptors(interceptors ...grpc.UnaryClientInterceptor) {
+	chain := grpc.WithUnaryInterceptor(grpc_middleware.ChainUnaryClient(interceptors...))
+	sc.addDialOption(chain)
+}
+
+func (sc *ServiceClientPool) SetStreamInterceptors(interceptors ...grpc.StreamClientInterceptor) {
+	chain := grpc.WithChainStreamInterceptor(grpc_middleware.ChainStreamClient(interceptors...))
+	sc.addDialOption(chain)
+}
+
+// SetTLS mutual TLS
+func (sc *ServiceClientPool) SetTLS(clientKeyPath, clientPemPath, caPemPath, commonName string) {
+	opt, err := setCert(clientKeyPath, clientPemPath, caPemPath, commonName)
+	if err != nil {
+		panic(err)
+	}
+	sc.useTLS = true
+	sc.addDialOption(opt)
 }
 
 func (sc *ServiceClientPool) SetServices(endpoint string, services ...string) {
@@ -263,7 +301,7 @@ func (sc *ServiceClientPool) Invoke(
 var scp *ServiceClientPool
 
 func NewDefaultPool() *ServiceClientPool {
-	co := ClientOption{
+	co := Option{
 		PoolSize:         defaultPoolSize,
 		DialTimeOut:      defaultDialTimeout,
 		KeepAlive:        defaultKeepAlive,

@@ -41,6 +41,11 @@ func (b *GrpcServerBuilder) SetUnaryInterceptors(interceptors ...grpc.UnaryServe
 	b.AddOption(chain)
 }
 
+func (b *GrpcServerBuilder) SetTLSCert(serverKeyPath, serverPemPath, caPemPath string) {
+	cred := setCert(serverKeyPath, serverPemPath, caPemPath)
+	b.AddOption(cred)
+}
+
 func (b *GrpcServerBuilder) Build() GrpcServer {
 	srv := grpc.NewServer(b.options...)
 	if b.enabledReflection {
