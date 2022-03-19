@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"os"
+	"io/ioutil"
 )
 
 func setCert(clientKeyPath, clientPemPath, caPemPath, commonName string) (opt grpc.DialOption, err error) {
@@ -14,7 +14,7 @@ func setCert(clientKeyPath, clientPemPath, caPemPath, commonName string) (opt gr
 		return
 	}
 	certPool := x509.NewCertPool()
-	ca, err := os.ReadFile(caPemPath)
+	ca, err := ioutil.ReadFile(caPemPath)
 	if err != nil {
 		return
 	}

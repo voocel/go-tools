@@ -3,10 +3,11 @@ package server
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"io/ioutil"
+	"log"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"log"
-	"os"
 )
 
 func setCert(serverKeyPath, serverPemPath, caPemPath string) grpc.ServerOption {
@@ -15,7 +16,7 @@ func setCert(serverKeyPath, serverPemPath, caPemPath string) grpc.ServerOption {
 		log.Panic(err)
 	}
 	certPool := x509.NewCertPool()
-	ca, err := os.ReadFile(caPemPath)
+	ca, err := ioutil.ReadFile(caPemPath)
 	if err != nil {
 		log.Panic(err)
 	}

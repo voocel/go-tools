@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -209,6 +211,17 @@ func (sc *ServiceClientPool) SetUnaryInterceptors(interceptors ...grpc.UnaryClie
 
 func (sc *ServiceClientPool) SetStreamInterceptors(interceptors ...grpc.StreamClientInterceptor) {
 	chain := grpc.WithChainStreamInterceptor(grpc_middleware.ChainStreamClient(interceptors...))
+	sc.addDialOption(chain)
+}
+
+func (sc *ServiceClientPool) SetRetry() {
+	opts := []grpc_retry.CallOption{
+		grpc_retry.WithMax(3),
+		grpc_retry.WithPerRetryTimeout(time.Second),
+		grpc_retry.WithBackoff(grpc_retry.BackoffLinearWithJitter(time.Millisecond*500, 0.2)),
+		grpc_retry.WithCodes(codes.Unavailable, codes.Aborted),
+	}
+	chain := grpc.WithUnaryInterceptor(grpc_middleware.ChainUnaryClient(grpc_retry.UnaryClientInterceptor(opts...)))
 	sc.addDialOption(chain)
 }
 
