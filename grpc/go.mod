@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/prometheus/client_golang v1.11.1 // indirect
