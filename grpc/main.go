@@ -22,6 +22,8 @@ func RunServer()  {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	builder := server.GrpcServerBuilder{}
 	builder.EnableReflection()
+	builder.EnablePrometheus()
+	builder.SetUnaryInterceptors(server.UnaryServerPrometheus())
 
 	s := builder.Build()
 	s.RegisterService(serviceRegister)
