@@ -32,9 +32,9 @@ func setCert(serverKeyPath, serverPemPath, caPemPath string) grpc.ServerOption {
 	cred := credentials.NewTLS(&tls.Config{
 		// Set the certificate chain to allow one or more certificates to be included
 		Certificates: []tls.Certificate{cert},
-		// The certificate of the client must be verified. Other parameters can be selected according to the actual situation
+		// The client is required to carry a certificate and the client will authenticate (multiple options are supported)
 		ClientAuth: tls.RequireAndVerifyClientCert,
-		// Set the collection of root certificates. The verification method uses the mode set in ClientAuth
+		// Set the collection of root certificates. The verification method uses the policy set in ClientAuth
 		ClientCAs: certPool,
 	})
 	return grpc.Creds(cred)

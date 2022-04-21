@@ -11,9 +11,8 @@ import (
 type GrpcServer interface {
 	Start(addr string) error
 	StartWithListener(l net.Listener)
-	Await(func())
 	RegisterService(func(*grpc.Server))
-	Serve()
+	Await(func())
 	Stop()
 }
 
@@ -27,14 +26,24 @@ func (s *grpcServer) Start(addr string) (err error) {
 	if err != nil {
 		return
 	}
-	go s.Serve()
+	go s.serve()
 	return
 }
 
 func (s *grpcServer) StartWithListener(l net.Listener) {
 	s.listener = l
-	go s.Serve()
+	go s.serve()
 	return
+}
+
+func (s *grpcServer) serve() {
+	if err := s.server.Serve(s.listener); err != nil {
+		panic(err)
+	}
+}
+
+func (s *grpcServer) RegisterService(reg func(*grpc.Server)) {
+	reg(s.server)
 }
 
 func (s *grpcServer) Await(hook func()) {
@@ -44,16 +53,6 @@ func (s *grpcServer) Await(hook func()) {
 	s.Stop()
 	if hook != nil {
 		hook()
-	}
-}
-
-func (s *grpcServer) RegisterService(reg func(*grpc.Server)) {
-	reg(s.server)
-}
-
-func (s *grpcServer) Serve() {
-	if err := s.server.Serve(s.listener); err != nil {
-		panic(err)
 	}
 }
 
