@@ -3,143 +3,143 @@ package color
 import "fmt"
 
 const (
-	reset = iota
-	bold
-	fuzzy
-	italic
-	underscore
-	blink
-	fastBlink
-	reverse
-	concealed
-	strikethrough
+	Reset = iota
+	Bold
+	Fuzzy
+	Italic
+	Underscore
+	Blink
+	FastBlink
+	Reverse
+	Concealed
+	Strikethrough
 )
 
 const (
-	black = iota + 30
-	red
-	green
-	yellow
-	blue
-	pink
-	cyan
-	gray
+	Black = iota + 30
+	Red
+	Green
+	Yellow
+	Blue
+	Pink
+	Cyan
+	Gray
 
-	white   = 97
-	unknown = 999
+	White   = 97
+	Unknown = 999
 )
 
 var colorMap = map[int]string{
-	bold:    "bold",
-	black:   "black",
-	red:     "red",
-	green:   "green",
-	yellow:  "yellow",
-	blue:    "blue",
-	pink:    "pink",
-	cyan:    "cyan",
-	gray:    "gray",
-	white:   "white",
-	unknown: "unknown",
+	Bold:    "bold",
+	Black:   "black",
+	Red:     "red",
+	Green:   "green",
+	Yellow:  "yellow",
+	Blue:    "blue",
+	Pink:    "pink",
+	Cyan:    "cyan",
+	Gray:    "gray",
+	White:   "white",
+	Unknown: "unknown",
 }
 
 func SetColor(text string, conf, bg, color int) string {
 	return fmt.Sprintf("%c[%d;%d;%dm%s%c[0m", 0x1B, conf, bg, color, text, 0x1B)
 }
 
-func Bold(s string) string {
-	return SetColor(s, 0, 0, bold)
+func BoldText(s string) string {
+	return SetColor(s, 0, 0, Bold)
 }
 
-func Black(s string) string {
-	return SetColor(s, 0, 0, black)
+func BlackText(s string) string {
+	return SetColor(s, 0, 0, Black)
 }
 
-func Red(s string) string {
-	return SetColor(s, 0, 0, red)
+func RedText(s string) string {
+	return SetColor(s, 0, 0, Red)
 }
 
-func Green(s string) string {
-	return SetColor(s, 0, 0, green)
+func GreenText(s string) string {
+	return SetColor(s, 0, 0, Green)
 }
 
-func Yellow(s string) string {
-	return SetColor(s, 0, 0, yellow)
+func YellowText(s string) string {
+	return SetColor(s, 0, 0, Yellow)
 }
 
-func Blue(s string) string {
-	return SetColor(s, 0, 0, blue)
+func BlueText(s string) string {
+	return SetColor(s, 0, 0, Blue)
 }
 
-func Pink(s string) string {
-	return SetColor(s, 0, 0, pink)
+func PinkText(s string) string {
+	return SetColor(s, 0, 0, Pink)
 }
 
-func Cyan(s string) string {
-	return SetColor(s, 0, 0, cyan)
+func CyanText(s string) string {
+	return SetColor(s, 0, 0, Cyan)
 }
 
-func Gray(s string) string {
-	return SetColor(s, 0, 0, gray)
+func GrayText(s string) string {
+	return SetColor(s, 0, 0, Gray)
 }
 
-func White(s string) string {
-	return SetColor(s, 0, 0, white)
+func WhiteText(s string) string {
+	return SetColor(s, 0, 0, White)
 }
 
 func PrintBold(s string) {
-	println(Bold(s))
+	println(BoldText(s))
 }
 
 func PrintBlack(s string) {
-	println(Black(s))
+	println(BlackText(s))
 }
 
 func PrintRed(s string) {
-	println(Red(s))
+	println(RedText(s))
 }
 
 func PrintGreen(s string) {
-	println(Green(s))
+	println(GreenText(s))
 }
 
 func PrintYellow(s string) {
-	println(Yellow(s))
+	println(YellowText(s))
 }
 
 func PrintBlue(s string) {
-	println(Blue(s))
+	println(BlueText(s))
 }
 
 func PrintPink(s string) {
-	println(Pink(s))
+	println(PinkText(s))
 }
 
 func PrintCyan(s string) {
-	println(Cyan(s))
+	println(CyanText(s))
 }
 
 func PrintGray(s string) {
-	println(Gray(s))
+	println(GrayText(s))
 }
 
 func PrintWhite(s string) {
-	println(White(s))
+	println(WhiteText(s))
 }
 
-func codeReason(code int) string {
+func CodeReason(code int) string {
 	v, ok := colorMap[code]
 	if !ok {
-		v = colorMap[unknown]
+		v = colorMap[Unknown]
 	}
 	return v
 }
 
-func colorToCode(s string) int {
+func ColorToCode(s string) int {
 	for k := range colorMap {
 		if colorMap[k] == s {
 			return k
 		}
 	}
-	return unknown
+	return Unknown
 }

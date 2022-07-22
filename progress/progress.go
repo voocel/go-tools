@@ -1,4 +1,4 @@
-package progress
+package main
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go-tools/pkg/color"
 )
 
 // Bar is a progress bar
@@ -19,6 +21,7 @@ type Bar struct {
 	Filled         string // Filled section representation ("█ ■")
 	Empty          string // Empty section representation ("░ □")
 	Width          int    // Width of the bar
+	Name           string // Name of the bar
 	Prefix         string // Prefix of the bar
 
 	text    string
@@ -43,7 +46,7 @@ func NewBar(total int64) *Bar {
 		done:           make(chan struct{}),
 	}
 	go b.listenRate()
-	b.template(`{{.Prefix}} {{.Percent | printf "%3.0f"}}% {{.Bar}} {{.Total}} {{.Rate}} {{.Text}}`)
+	b.template(`{{.Prefix}} {{.Name}} {{.Percent | printf "%3.0f"}}% {{.Bar}} {{.Total}} {{.Rate}} {{.Text}}`)
 
 	return b
 }
@@ -56,9 +59,11 @@ func (b *Bar) listenRate() {
 		select {
 		case <-tick.C:
 			r := b.current - b.prev
-			b.rate = "[" + b.bytesToSize(r*10) + "/s]"
+			b.rate = "[" + b.bytesToSize(r*10) + "/s]  "
+			b.rate = color.SetColor(b.rate, 0, 0, color.Yellow)
 			b.prev = b.current
 		case <-b.done:
+			fmt.Println()
 			return
 		}
 	}
@@ -73,9 +78,44 @@ func (b *Bar) template(s string) {
 	b.tmpl = t
 }
 
-// Text set the text value
-func (b *Bar) Text(s string) {
+// SetText set the text value
+func (b *Bar) SetText(s string, colorText ...string) {
 	b.text = s
+	if len(colorText) > 0 {
+		b.text = color.SetColor(b.text, 0, 0, color.ColorToCode(colorText[0]))
+	}
+}
+
+// SetPrefix set the prefix value
+func (b *Bar) SetPrefix(s string, colorText ...string) {
+	b.Prefix = s
+	if len(colorText) > 0 {
+		b.Prefix = color.SetColor(b.Prefix, 0, 0, color.ColorToCode(colorText[0]))
+	}
+}
+
+// SetName set the prefix value
+func (b *Bar) SetName(s string, colorText ...string) {
+	b.Name = s
+	if len(colorText) > 0 {
+		b.Name = color.SetColor(b.Name, 0, 0, color.ColorToCode(colorText[0]))
+	}
+}
+
+// SetFilled set the filled value
+func (b *Bar) SetFilled(s string, colorText ...string) {
+	b.Filled = s
+	if len(colorText) > 0 {
+		b.Filled = color.SetColor(b.Filled, 0, 0, color.ColorToCode(colorText[0]))
+	}
+}
+
+// SetEmpty set the empty value
+func (b *Bar) SetEmpty(s string, colorText ...string) {
+	b.Empty = s
+	if len(colorText) > 0 {
+		b.Empty = color.SetColor(b.Empty, 0, 0, color.ColorToCode(colorText[0]))
+	}
 }
 
 // Add the specified amount to the progressbar
@@ -85,7 +125,7 @@ func (b *Bar) Add(n int64) {
 		panic("cannot be greater than the total")
 	}
 	if b.current == b.total {
-		b.Prefix = "success"
+		b.Prefix = "Success"
 	}
 }
 
@@ -97,6 +137,7 @@ func (b *Bar) string() string {
 	}
 	data := struct {
 		Prefix  string
+		Name    string
 		Percent float64
 		Bar     string
 		Text    string
@@ -104,6 +145,7 @@ func (b *Bar) string() string {
 		Total   string
 	}{
 		Prefix:  b.Prefix,
+		Name:    b.Name,
 		Percent: b.percent(),
 		Bar:     b.bar(),
 		Text:    b.text,
@@ -111,6 +153,7 @@ func (b *Bar) string() string {
 		Total:   b.formatTotal(),
 	}
 
+	data.Total = color.SetColor(b.formatTotal(), 0, 0, color.Green)
 	if err := b.tmpl.Execute(&buf, data); err != nil {
 		panic(err)
 	}
