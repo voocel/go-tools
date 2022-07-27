@@ -22,7 +22,7 @@ type Bar struct {
 	Empty          string // Empty section representation ("░ □")
 	Width          int    // Width of the bar
 	Name           string // Name of the bar
-	Prefix         string // Prefix of the bar
+	Status         string // Status of the bar
 
 	text    string
 	rate    string
@@ -41,7 +41,7 @@ func NewBar(total int64) *Bar {
 		Filled:         "█",
 		Empty:          "░",
 		Width:          50,
-		Prefix:         "Downloading",
+		Status:         "Downloading",
 		total:          total,
 		done:           make(chan struct{}),
 	}
@@ -86,11 +86,11 @@ func (b *Bar) SetText(s string, colorText ...string) {
 	}
 }
 
-// SetPrefix set the prefix value
-func (b *Bar) SetPrefix(s string, colorText ...string) {
-	b.Prefix = s
+// SetStatus set the Status value
+func (b *Bar) SetStatus(s string, colorText ...string) {
+	b.Status = s
 	if len(colorText) > 0 {
-		b.Prefix = color.SetColor(b.Prefix, 0, 0, color.ColorToCode(colorText[0]))
+		b.Status = color.SetColor(b.Status, 0, 0, color.ColorToCode(colorText[0]))
 	}
 }
 
@@ -125,7 +125,7 @@ func (b *Bar) Add(n int64) {
 		panic("cannot be greater than the total")
 	}
 	if b.current == b.total {
-		b.Prefix = "Success"
+		b.Status = "Success"
 	}
 }
 
@@ -136,7 +136,7 @@ func (b *Bar) string() string {
 		b.rate = "[" + b.bytesToSize(0) + "/s]"
 	}
 	data := struct {
-		Prefix  string
+		Status  string
 		Name    string
 		Percent float64
 		Bar     string
@@ -144,7 +144,7 @@ func (b *Bar) string() string {
 		Rate    string
 		Total   string
 	}{
-		Prefix:  b.Prefix,
+		Status:  b.Status,
 		Name:    b.Name,
 		Percent: b.percent(),
 		Bar:     b.bar(),
