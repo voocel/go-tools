@@ -45,9 +45,19 @@ func Init(serviceName, filePath, level string) {
 		}
 	}()
 
-	core := newCore(filePath, toZapLevel(level), "info.log")
+	// error, fatal, panic
+	highLevel := zap.LevelEnablerFunc(func(l zapcore.Level) bool {
+		return l >= zap.ErrorLevel
+	})
+	// info, debug
+	lowLever := zap.LevelEnablerFunc(func(l zapcore.Level) bool {
+		return l < zap.ErrorLevel && l >= toZapLevel(level)
+	})
+
+	highCore := newCore(filePath, highLevel, "error.log")
+	lowCore := newCore(filePath, lowLever, "info.log")
 	log := zap.New(
-		core,
+		zapcore.NewTee(highCore, lowCore),
 		zap.AddCaller(),
 		zap.AddCallerSkip(1),
 		zap.Development(),
@@ -65,7 +75,7 @@ func funcName() string {
 	return filepath.Base(runtime.FuncForPC(pc).Name())
 }
 
-func newCore(filePath string, level zapcore.Level, filename string) zapcore.Core {
+func newCore(filePath string, priority zap.LevelEnablerFunc, filename string) zapcore.Core {
 	filename = strings.Replace(filename, ".log", "", -1) +
 		"-" + time.Now().Format("2006-01-02") + ".log"
 	logPath := filepath.Join(filepath.Dir(filePath), filename)
@@ -97,7 +107,7 @@ func newCore(filePath string, level zapcore.Level, filename string) zapcore.Core
 			zapcore.AddSync(os.Stdout),
 			zapcore.AddSync(fileWriteSyncer),
 		),
-		level,
+		priority,
 	)
 }
 
