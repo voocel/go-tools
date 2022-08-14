@@ -115,8 +115,8 @@ func Debug(args ...interface{}) {
 	logger.Debug(args...)
 }
 
-func Debugf(template string, args ...interface{}) {
-	logger.Debugf(template, args...)
+func Debugf(format string, args ...interface{}) {
+	logger.Debugf(format, args...)
 }
 
 func Debugw(msg string, keysAndValues ...interface{}) {
@@ -127,8 +127,8 @@ func Info(args ...interface{}) {
 	logger.Info(args...)
 }
 
-func Infof(template string, args ...interface{}) {
-	logger.Infof(template, args...)
+func Infof(format string, args ...interface{}) {
+	logger.Infof(format, args...)
 }
 
 func Infow(msg string, keysAndValues ...interface{}) {
@@ -139,8 +139,8 @@ func Warn(args ...interface{}) {
 	logger.Warn(args...)
 }
 
-func Warnf(template string, args ...interface{}) {
-	logger.Warnf(template, args...)
+func Warnf(format string, args ...interface{}) {
+	logger.Warnf(format, args...)
 }
 
 func Warnw(msg string, keysAndValues ...interface{}) {
@@ -151,20 +151,28 @@ func Error(args ...interface{}) {
 	logger.Error(args...)
 }
 
-func Errorf(template string, args ...interface{}) {
-	logger.Errorf(template, args...)
+func Errorf(format string, args ...interface{}) {
+	logger.Errorf(format, args...)
 }
 
 func Errorw(msg string, keysAndValues ...interface{}) {
 	logger.Errorw(msg, keysAndValues...)
 }
 
+func Fatal(args ...interface{}) {
+	logger.Fatal(args...)
+}
+
+func Fatalf(format string, args ...interface{}) {
+	logger.Fatalf(format, args...)
+}
+
 func Panic(args ...interface{}) {
 	logger.Panic(args...)
 }
 
-func Panicf(template string, args ...interface{}) {
-	logger.Panicf(template, args...)
+func Panicf(format string, args ...interface{}) {
+	logger.Panicf(format, args...)
 }
 
 func Panicw(msg string, keysAndValues ...interface{}) {
