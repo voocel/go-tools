@@ -4,6 +4,8 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
@@ -12,6 +14,7 @@ type GrpcServerBuilder struct {
 	options           []grpc.ServerOption
 	enabledReflection bool
 	enabledPrometheus bool
+	enabledHealth     bool
 }
 
 func (b *GrpcServerBuilder) EnableReflection() {
@@ -20,6 +23,10 @@ func (b *GrpcServerBuilder) EnableReflection() {
 
 func (b *GrpcServerBuilder) EnablePrometheus() {
 	b.enabledPrometheus = true
+}
+
+func (b *GrpcServerBuilder) EnabledHealth()  {
+	b.enabledHealth = true
 }
 
 func (b *GrpcServerBuilder) AddOption(opt grpc.ServerOption) {
@@ -54,6 +61,12 @@ func (b *GrpcServerBuilder) Build() GrpcServer {
 	if b.enabledPrometheus {
 		grpc_prometheus.EnableHandlingTimeHistogram()
 		grpc_prometheus.Register(srv)
+	}
+	if b.enabledHealth {
+		h := health.NewServer()
+		grpc_health_v1.RegisterHealthServer(srv, h)
+		serviceName := "grpc_service_name"
+		h.SetServingStatus(serviceName, grpc_health_v1.HealthCheckResponse_SERVING)
 	}
 	return &grpcServer{srv, nil}
 }
