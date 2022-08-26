@@ -102,6 +102,20 @@ func (p *Pool) defaultDialOptions() []grpc.DialOption {
 		//	Backoff:           backoff.Config{MaxDelay: 8*time.Second},
 		//	MinConnectTimeout: 0,
 		//}),
+		//grpc.WithDefaultServiceConfig(fmt.Sprintf(`{
+		//	"LoadBalancingPolicy": "%s",
+		//	"MethodConfig": [
+		//		{
+		//			"Name": [{"Service": "helloworld.Greeter"}],
+		//			"RetryPolicy": {
+		//				"MaxAttempts":2, "InitialBackoff": "0.1s",
+		//				"MaxBackoff": "1s", "BackoffMultiplier": 2.0,
+		//				"RetryableStatusCodes": ["UNAVAILABLE", "CANCELLED"]
+		//			}
+		//		}
+		//	],
+		//	"HealthCheckConfig": {"ServiceName": "helloworld.Greeter"}
+		//}`, roundrobin.Name)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(UnaryClientInterceptor),
 		grpc.WithInitialWindowSize(defaultInitialWindowSize),

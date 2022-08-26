@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
@@ -65,8 +66,20 @@ func (b *GrpcServerBuilder) Build() GrpcServer {
 	if b.enabledHealth {
 		h := health.NewServer()
 		grpc_health_v1.RegisterHealthServer(srv, h)
-		serviceName := "grpc_service_name"
+		serviceName := "custom_grpc_service_name"
 		h.SetServingStatus(serviceName, grpc_health_v1.HealthCheckResponse_SERVING)
+
+		//grpc_health_v1.RegisterHealthServer(srv, &HealthImpl{})
 	}
 	return &grpcServer{srv, nil}
+}
+
+type HealthImpl struct{}
+func (h *HealthImpl) Check(ctx context.Context, in *grpc_health_v1.HealthCheckRequest) (*grpc_health_v1.HealthCheckResponse, error) {
+	return &grpc_health_v1.HealthCheckResponse{
+		Status: grpc_health_v1.HealthCheckResponse_SERVING,
+	}, nil
+}
+func (h *HealthImpl) Watch(in *grpc_health_v1.HealthCheckRequest, stream grpc_health_v1.Health_WatchServer) error {
+	return nil
 }
