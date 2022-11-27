@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/balancer/roundrobin"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -95,6 +98,18 @@ func (p *Pool) checkState(conn *grpc.ClientConn) error {
 	return nil
 }
 
+// refer to https://github.com/grpc/grpc-proto/blob/master/grpc/service_config/service_config.proto
+//retryPolicy := fmt.Sprintf(`{
+//		"methodConfig": [{
+//		  "name": [{"service": "%s"}],
+//		  "retryPolicy": {
+//			  "MaxAttempts": %d,
+//			  "InitialBackoff": "%fs",
+//			  "MaxBackoff": "%fs",
+//			  "BackoffMultiplier": %f,
+//			  "RetryableStatusCodes": [ "UNAVAILABLE" ]
+//		  }
+//		}]}`, RetryServiceName, MaxAttempts, InitialBackoff, MaxBackoff, BackoffMultiplier)
 func (p *Pool) defaultDialOptions() []grpc.DialOption {
 	return []grpc.DialOption{
 		//grpc.WithBlock(),
@@ -102,30 +117,42 @@ func (p *Pool) defaultDialOptions() []grpc.DialOption {
 		//	Backoff:           backoff.Config{MaxDelay: 8*time.Second},
 		//	MinConnectTimeout: 0,
 		//}),
-		//grpc.WithDefaultServiceConfig(fmt.Sprintf(`{
-		//	"LoadBalancingPolicy": "%s",
-		//	"MethodConfig": [
-		//		{
-		//			"Name": [{"Service": "helloworld.Greeter"}],
-		//			"RetryPolicy": {
-		//				"MaxAttempts":2, "InitialBackoff": "0.1s",
-		//				"MaxBackoff": "1s", "BackoffMultiplier": 2.0,
-		//				"RetryableStatusCodes": ["UNAVAILABLE", "CANCELLED"]
-		//			}
-		//		}
-		//	],
-		//	"HealthCheckConfig": {"ServiceName": "helloworld.Greeter"}
-		//}`, roundrobin.Name)),
+		//grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "round_robin"}`),
+		grpc.WithDefaultServiceConfig(fmt.Sprintf(`{
+			"LoadBalancingPolicy": "%s",
+			"MethodConfig": [
+				{
+					"Name": [{"Service": "helloworld.Greeter"}], 
+					"RetryPolicy": {
+						"MaxAttempts":2, "InitialBackoff": "0.1s", 
+						"MaxBackoff": "1s", "BackoffMultiplier": 2.0, 
+						"RetryableStatusCodes": ["UNAVAILABLE", "CANCELLED"]
+					}
+				}
+			],
+			"HealthCheckConfig": {"ServiceName": "helloworld.Greeter"}
+		}`, roundrobin.Name)),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(UnaryClientInterceptor),
 		grpc.WithInitialWindowSize(defaultInitialWindowSize),
 		grpc.WithInitialConnWindowSize(defaultInitialConnWindowSize),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaultMaxSendMsgSize)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaultMaxMaxRecvMsgSize)),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallSendMsgSize(defaultMaxSendMsgSize),
+			grpc.MaxCallRecvMsgSize(defaultMaxMaxRecvMsgSize),
+		),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                p.option.KeepAlive,
 			Timeout:             p.option.KeepAliveTimeout,
 			PermitWithoutStream: true,
+		}),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: backoff.Config{
+				BaseDelay:  100 * time.Millisecond,
+				Multiplier: 1.6,
+				Jitter:     0.2,
+				MaxDelay:   3 * time.Second,
+			},
+			MinConnectTimeout: defaultDialTimeout,
 		}),
 	}
 }
