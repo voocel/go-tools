@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,8 +19,10 @@ const (
 	endpoint = ":4246"
 )
 
-var logger *zap.SugaredLogger
-var atomicLevel = zap.NewAtomicLevel()
+var (
+	srv    *http.Server
+	logger *zap.SugaredLogger
+)
 
 var levelMap = map[string]zapcore.Level{
 	"debug": zapcore.DebugLevel,
@@ -38,9 +41,15 @@ func toZapLevel(l string) zapcore.Level {
 }
 
 func Init(serviceName, filePath, level string) {
-	http.HandleFunc(pattern, atomicLevel.ServeHTTP)
+	var atomicLevel = zap.NewAtomicLevel()
+	mux := http.NewServeMux()
+	mux.HandleFunc(pattern, atomicLevel.ServeHTTP)
+	srv = &http.Server{
+		Addr:    endpoint,
+		Handler: mux,
+	}
 	go func() {
-		if err := http.ListenAndServe(endpoint, nil); err != nil {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			panic(err)
 		}
 	}()
@@ -180,7 +189,8 @@ func Panicw(msg string, keysAndValues ...interface{}) {
 }
 
 func Sync() error {
-	if logger != nil {
+	if srv != nil && logger != nil {
+		srv.Shutdown(context.Background())
 		return logger.Sync()
 	}
 	return nil
